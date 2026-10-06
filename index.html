@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Aegis Pathfinder</title>
+<meta name="description" content="Attack-aware pathfinding lab: threat recognition, twelve planners and live agent simulation.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="web/styles.css">
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <div class="brand">
+      <h1>Aegis</h1>
+      <span>Attack-aware pathfinding</span>
+    </div>
+    <div class="field-inline">
+      <label class="label" for="scenario">Scenario</label>
+      <select id="scenario"></select>
+      <button id="reseed" class="btn small" type="button" hidden>New seed</button>
+    </div>
+    <nav class="tabs" role="tablist" aria-label="View">
+      <button role="tab" id="tab-plan" data-mode="plan" aria-selected="true" type="button">Plan</button>
+      <button role="tab" id="tab-compare" data-mode="compare" aria-selected="false" type="button">Compare</button>
+      <button role="tab" id="tab-race" data-mode="race" aria-selected="false" type="button">Race</button>
+      <button role="tab" id="tab-pareto" data-mode="pareto" aria-selected="false" type="button">Risk sweep</button>
+      <button role="tab" id="tab-recon" data-mode="recon" aria-selected="false" type="button">Recon</button>
+    </nav>
+  </header>
+  <p class="scenario-blurb" id="blurb"></p>
+
+  <main class="layout">
+    <aside class="panel" id="planner-rail" aria-label="Planner and map controls">
+      <section>
+        <h2>Planner <small id="planner-mode-note"></small></h2>
+        <div class="planner-list" id="planner-list"></div>
+        <div class="planner-blurb" id="planner-blurb"></div>
+      </section>
+      <section>
+        <h2>Parameters</h2>
+        <div class="param">
+          <div class="param-head"><label class="label" for="risk">Risk aversion λ</label><output id="risk-out" for="risk"></output></div>
+          <input type="range" id="risk" min="0" max="100" step="1">
+          <p class="hint">Score = travel time + λ × damage. At λ = 0 only speed matters.</p>
+        </div>
+        <div class="param">
+          <span class="label">Static planners assume</span>
+          <div class="seg" id="risk-mode" role="group" aria-label="Threat model for static planners">
+            <button type="button" data-v="mean" aria-pressed="true">Average fire</button>
+            <button type="button" data-v="peak" aria-pressed="false">Worst case</button>
+          </div>
+        </div>
+        <div class="param">
+          <div class="param-head"><label class="label" for="weight">Weighted A* factor w</label><output id="weight-out" for="weight"></output></div>
+          <input type="range" id="weight" min="1" max="4" step="0.1">
+        </div>
+        <div class="param">
+          <div class="param-head"><label class="label" for="anim">Search replay</label><output id="anim-out" for="anim"></output></div>
+          <input type="range" id="anim" min="0" max="8" step="0.5">
+        </div>
+        <div class="param">
+          <div class="param-head"><label class="label" for="sensor">Recon sensor range</label><output id="sensor-out" for="sensor"></output></div>
+          <input type="range" id="sensor" min="3" max="14" step="1">
+        </div>
+        <div class="param">
+          <label class="switch"><span>Diagonal moves</span><input type="checkbox" id="diagonal" checked></label>
+        </div>
+      </section>
+      <section>
+        <h2>Map editor</h2>
+        <div class="tools" id="tools-terrain" role="group" aria-label="Terrain tools"></div>
+        <p class="label tools-sub">Attackers</p>
+        <div class="tools" id="tools-attack" role="group" aria-label="Attacker tools"></div>
+        <div class="row-actions">
+          <button class="btn small" id="clear-attackers" type="button">Remove all attackers</button>
+          <button class="btn small" id="reset-map" type="button">Reset scenario</button>
+        </div>
+        <p class="hint" style="margin-top:10px">Drag S or G to move them. Paint terrain by dragging. Click an attacker to edit it. Keys: <span class="kbd">R</span> run, <span class="kbd">Space</span> pause, <span class="kbd">Del</span> remove.</p>
+      </section>
+    </aside>
+
+    <section class="stage" aria-label="Map">
+      <div class="stage-bar">
+        <button class="btn primary" id="run" type="button">Run</button>
+        <button class="btn" id="replay" type="button">Replay agents</button>
+        <div class="clock">
+          <button class="btn small" id="play" type="button" aria-label="Pause threat clock">Pause</button>
+          <output id="clock" aria-live="off">t 0.0 s</output>
+          <label class="label" for="speed">Speed</label>
+          <select id="speed">
+            <option value="1">1×</option>
+            <option value="2">2×</option>
+            <option value="4">4×</option>
+            <option value="6" selected>6×</option>
+            <option value="10">10×</option>
+          </select>
+        </div>
+        <span class="grow"></span>
+        <div class="seg" id="heat-mode" role="group" aria-label="Threat heat">
+          <button type="button" data-v="off" aria-pressed="false">No heat</button>
+          <button type="button" data-v="mean" aria-pressed="false">Average</button>
+          <button type="button" data-v="live" aria-pressed="true">Live</button>
+          <button type="button" data-v="peak" aria-pressed="false">Worst</button>
+        </div>
+        <div class="overlay-toggles" id="overlays">
+          <button class="chip" type="button" data-k="zones" aria-pressed="false">Zones</button>
+          <button class="chip" type="button" data-k="ranges" aria-pressed="true">Ranges</button>
+          <button class="chip" type="button" data-k="search" aria-pressed="true">Search</button>
+          <button class="chip" type="button" data-k="flow" aria-pressed="false">Flow</button>
+        </div>
+      </div>
+      <div class="map-wrap" id="map-wrap">
+        <canvas id="map" aria-label="Tactical map with threats, search progress and routes"></canvas>
+        <div class="map-badge" id="badge" aria-live="polite"></div>
+      </div>
+      <div class="race" id="race" hidden></div>
+      <div class="legend" id="legend"></div>
+      <p class="footer-note">Every route is replayed against the true, time-varying threat model. Static planners see time-averaged fire. Space-Time A* sees the timing.</p>
+    </section>
+
+    <aside class="panel" id="intel-rail" aria-label="Results and threat intelligence">
+      <section id="results"></section>
+      <section id="intel"></section>
+      <section id="inspector"></section>
+    </aside>
+  </main>
+</div>
+<script type="module" src="web/app.js"></script>
+</body>
+</html>

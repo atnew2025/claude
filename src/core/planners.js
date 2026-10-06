@@ -236,4 +236,15 @@ export function riskSweep(problem, { lambdas = [0, 0.05, 0.15, 0.3, 0.6, 1, 2, 4
   return points;
 }
 
-const pick = (m) => ({ time: m.time, damage: m.damage, distance: m.distance, survived: m.survived, frames: m.frames });
+const pick = (m) => ({
+  time: m.time,
+  damage: m.damage,
+  distance: m.distance,
+  survived: m.survived,
+  deathTime: m.deathTime,
+  expanded: m.expanded,
+  ms: m.ms,
+  frames: m.frames,
+  curve: m.curve,
+  curveDt: m.curveDt,
+});
